@@ -1,23 +1,18 @@
+/*
+ksttool 에 대한 의존이 있음
+*/
 (function () {
    var root = this;
    var PixiPolygon = function (options) {
       var pointer = this;
       for (var key in options) { pointer[key] = options[key]; }
-      pointer.extracted_path = ksttool.extract_XYX(pointer.path, { x: 0.5, y: 0.5 });
       pointer.surface_color = pointer.surface_color ? pointer.surface_color : 0x00FF00;
+      pointer.line_color = pointer.line_color ? pointer.line_color : 0xffd900;
       let graphics = new PIXI.Graphics();
       (pointer.stage || pointer.parent).addChild(graphics);
-      graphics.beginFill(pointer.surface_color);
-      graphics.lineStyle(0, 0xffd900, 0);
-      graphics.moveTo(pointer.extracted_path.path[0].x, pointer.extracted_path.path[0].y);
-      for (let i = 1; i < pointer.extracted_path.path.length; i++) {
-         graphics.lineTo(pointer.extracted_path.path[i].x, pointer.extracted_path.path[i].y);
-      }
-      graphics.closePath();
-      graphics.endFill();
-      graphics.position.set(pointer.extracted_path.min_x, pointer.extracted_path.min_y);
-      pointer.vector = false;
       pointer.node = graphics;
+      pointer.redraw(pointer.path, pointer.surface_color);
+      pointer.vector = false;
       pointer.node.nodeID = $pxx.common.uniquue();
       pointer.node.getID = function () {
          return pointer.node.nodeID;
@@ -25,6 +20,22 @@
    };
    PixiPolygon.prototype = {
       init: function () {
+      },
+      redraw: function (path, surface_color) {
+         let pointer = this;
+         pointer.path = path;
+         pointer.surface_color = surface_color;
+         pointer.extracted_path = ksttool.extract_XYX(path, { x: 0.5, y: 0.5 });
+         pointer.node.clear();
+         pointer.node.beginFill(surface_color);
+         pointer.node.lineStyle(0, pointer.line_color, 0);
+         pointer.node.moveTo(pointer.extracted_path.path[0].x, pointer.extracted_path.path[0].y);
+         for (let i = 1; i < pointer.extracted_path.path.length; i++) {
+            pointer.node.lineTo(pointer.extracted_path.path[i].x, pointer.extracted_path.path[i].y);
+         }
+         pointer.node.position.set(pointer.extracted_path.min_x, pointer.extracted_path.min_y);
+         pointer.node.closePath();
+         pointer.node.endFill();
       },
       getWorldPathInPLPType: function () {
          let pointer = this;
