@@ -1,4 +1,5 @@
 /*
+-------------------------------------------------------
 ksttool 에 대한 의존이 있음
 */
 (function () {
@@ -11,7 +12,7 @@ ksttool 에 대한 의존이 있음
       let graphics = new PIXI.Graphics();
       (pointer.stage || pointer.parent).addChild(graphics);
       pointer.node = graphics;
-      pointer.redraw(pointer.path, pointer.surface_color);
+      pointer.redraw(pointer.path, pointer.surface_color, true);
       pointer.vector = false;
       pointer.node.nodeID = $pxx.common.uniquue();
       pointer.node.getID = function () {
@@ -21,7 +22,7 @@ ksttool 에 대한 의존이 있음
    PixiPolygon.prototype = {
       init: function () {
       },
-      redraw: function (path, surface_color) {
+      redraw: function (path, surface_color, reposition) {
          let pointer = this;
          pointer.path = path;
          pointer.surface_color = surface_color;
@@ -33,7 +34,9 @@ ksttool 에 대한 의존이 있음
          for (let i = 1; i < pointer.extracted_path.path.length; i++) {
             pointer.node.lineTo(pointer.extracted_path.path[i].x, pointer.extracted_path.path[i].y);
          }
-         pointer.node.position.set(pointer.extracted_path.min_x, pointer.extracted_path.min_y);
+         if (reposition) {
+            pointer.node.position.set(pointer.extracted_path.min_x, pointer.extracted_path.min_y);
+         }
          pointer.node.closePath();
          pointer.node.endFill();
       },
@@ -70,4 +73,6 @@ ksttool 에 대한 의존이 있음
    root.PixiPolygon = PixiPolygon;
 }).call(this);
 
-
+/*
+-------------------------------------------------------
+*/
