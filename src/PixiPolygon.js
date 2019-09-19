@@ -1,3 +1,8 @@
+//================
+//================
+//================
+//================
+
 (function () {
     var root = this;
     var PixiPolygon = function (options) {
@@ -5,7 +10,12 @@
         for (var key in options) { pointer[key] = options[key]; }
         pointer.surface_color = pointer.surface_color ? pointer.surface_color : 0x00FF00;
         pointer.line_color = pointer.line_color ? pointer.line_color : 0xffd900;
-        pointer.degree = pointer.degree ? pointer.degree : 0;
+        pointer.change = {};
+        pointer.change.path = true;
+        pointer.change.pivot = true;
+        pointer.change.degree = true;
+        pointer.change.surface_color = true;
+        pointer.change.extracted_path = true;
 
         let graphics = new PIXI.Graphics();
         (pointer.stage || pointer.parent).addChild(graphics);
@@ -34,18 +44,64 @@
     PixiPolygon.prototype = {
         init: function () {
         },
+        setPath: function (path, no_draw) {
+            let pointer = this;
+            let mark = false;
+            if (path && pointer.path) {
+                if (path.length === pointer.path.length) {
+                    for (let i = 0, len = path.length; i < len; i++) {
+                        if (!(path[i].x === pointer.path[i].x && path[i].y === pointer.path[i].y)) {
+                            mark = true;
+                        }
+                    }
+                } else {
+                    mark = true;
+                }
+            }
+            if (path && !pointer.path) {
+                mark = true;
+            }
+            if (mark) {
+                pointer.change.path = true;
+            }
+            pointer.path = path;
+            pointer.path = pointer.path ? pointer.path : [];
+            if (!no_draw) { pointer.draw(); }
+        },
         setPivot: function (pivot, no_draw) {
             let pointer = this;
-            pointer.pivot_point = pivot;
-            if (!pointer.pivot_point) {
-                pointer.pivot_point = { x: 0.5, y: 0.5 };
+            let mark = false;
+            if (pointer.pivot_point && pivot) {
+                if (!(pointer.pivot_point.x === pivot.x && pointer.pivot_point.y === pivot.y)) {
+                    mark = true;
+                }
             }
+            if (!pointer.pivot_point && pivot) {
+                mark = true;
+            }
+            if (mark) {
+                pointer.change.pivot = true;
+            }
+            pointer.pivot_point = pivot;
+            pointer.pivot_point = pointer.pivot_point ? pointer.pivot_point : { x: 0.5, y: 0.5 };
             if (!no_draw) { pointer.draw(); }
         },
         setRotation: function (degree, no_draw) {
             let pointer = this;
+            if (pointer.degree !== degree) {
+                pointer.change.degree = true;
+            }
             pointer.degree = degree;
             pointer.degree = pointer.degree ? pointer.degree : 0;
+            if (!no_draw) { pointer.draw(); }
+        },
+        setColor: function (surface_color, no_draw) {
+            let pointer = this;
+            if (pointer.surface_color !== surface_color) {
+                pointer.change.surface_color = true;
+            }
+            pointer.surface_color = surface_color;
+            pointer.surface_color = pointer.surface_color ? pointer.surface_color : 0xffffff;
             if (!no_draw) { pointer.draw(); }
         },
         draw: function () {
@@ -54,35 +110,43 @@
         },
         redraw: function (path, surface_color, reposition) {
             let pointer = this;
-            pointer.path = path;
-            pointer.surface_color = surface_color;
-            pointer.extracted_path = ksttool.extract_XYX(pointer.path, pointer.pivot_point);
-            pointer.node.clear();
-            pointer.node.beginFill(surface_color);
-            pointer.node.lineStyle(0, pointer.line_color, 0);
-            //---
-            // 각도 적용부분..
-            // 성능 최적화 여지 있음 (캐싱이 좀 필요하다)
-            //---
-            let nls = [];
-            let pivot_point = { x: pointer.extracted_path.min_x, y: pointer.extracted_path.min_y };
-            for (let i = 0, len = pointer.path.length; i < len; i++) {
-                let fee = ksttool.math.rotation_coordinate(pivot_point, pointer.path[i], pointer.degree);
-                fee.x -= pointer.extracted_path.min_x;
-                fee.y -= pointer.extracted_path.min_y;
-                nls[nls.length] = fee;
+            pointer.setPath(path, true);
+            pointer.setColor(surface_color, true);
+
+            if (pointer.change.pivot || pointer.change.path) {
+                pointer.extracted_path = ksttool.extract_XYX(pointer.path, pointer.pivot_point);
+                pointer.change.extracted_path = true;
             }
-            pointer.extracted_path.path = nls;
             //---
-            pointer.node.moveTo(pointer.extracted_path.path[0].x, pointer.extracted_path.path[0].y);
-            for (let i = 1; i < pointer.extracted_path.path.length; i++) {
-                pointer.node.lineTo(pointer.extracted_path.path[i].x, pointer.extracted_path.path[i].y);
+            if (pointer.change.degree || pointer.change.extracted_path) {
+                pointer.nls = [];
+                let pivot_point = { x: pointer.extracted_path.min_x, y: pointer.extracted_path.min_y };
+                for (let i = 0, len = pointer.path.length; i < len; i++) {
+                    let fee = ksttool.math.rotation_coordinate(pivot_point, pointer.path[i], pointer.degree);
+                    fee.x -= pointer.extracted_path.min_x;
+                    fee.y -= pointer.extracted_path.min_y;
+                    pointer.nls[pointer.nls.length] = fee;
+                }
             }
-            if (reposition) {
-                pointer.node.position.set(pointer.extracted_path.min_x, pointer.extracted_path.min_y);
+            if (pointer.change.surface_color || pointer.change.extracted_path || (pointer.change.degree || pointer.change.extracted_path) || reposition) {
+                pointer.node.clear();
+                pointer.node.beginFill(surface_color);
+                pointer.node.lineStyle(0, pointer.line_color, 0);
+                pointer.node.moveTo(pointer.nls[0].x, pointer.nls[0].y);
+                for (let i = 1; i < pointer.nls.length; i++) {
+                    pointer.node.lineTo(pointer.nls[i].x, pointer.nls[i].y);
+                }
+                if (reposition) {
+                    pointer.node.position.set(pointer.extracted_path.min_x, pointer.extracted_path.min_y);
+                }
+                pointer.node.closePath();
+                pointer.node.endFill();
             }
-            pointer.node.closePath();
-            pointer.node.endFill();
+            pointer.change.path = false;
+            pointer.change.pivot = false;
+            pointer.change.degree = false;
+            pointer.change.surface_color = false;
+            pointer.change.extracted_path = false;
         },
         getWorldPathInPLPType: function () {
             let pointer = this;
@@ -116,3 +180,8 @@
     };
     root.PixiPolygon = PixiPolygon;
 }).call(this);
+
+ //================
+ //================
+ //================
+ //================  
